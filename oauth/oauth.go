@@ -466,6 +466,37 @@ func (c *Client) Get(client *http.Client, credentials *Credentials, urlStr strin
 	return client.Do(req)
 }
 
+// ProxyGet issues a GET to the specified URL with form added as a query string, but the request is sent to proxy url
+func (c *Client) ProxyGet(client *http.Client, credentials *Credentials, proxyUrl, realUrl string, form url.Values) (*http.Response, error) {
+	req, err := http.NewRequest("GET", proxyUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	if req.URL.RawQuery != "" {
+		return nil, errors.New("oauth: url must not contain a query string")
+	}
+	for k, v := range c.Header {
+		req.Header[k] = v
+	}
+
+	temp, err := http.NewRequest("GET", realUrl, nil)
+	if err != nil {
+		return nil, err
+	}
+	if temp.URL.RawQuery != "" {
+		return nil, errors.New("oauth: url must not contain a query string")
+	}
+
+	if err := c.SetAuthorizationHeader(req.Header, credentials, "GET", temp.URL, form); err != nil {
+		return nil, err
+	}
+	req.URL.RawQuery = form.Encode()
+	if client == nil {
+		client = http.DefaultClient
+	}
+	return client.Do(req)
+}
+
 func (c *Client) do(client *http.Client, method string, credentials *Credentials, urlStr string, form url.Values) (*http.Response, error) {
 	req, err := http.NewRequest(method, urlStr, strings.NewReader(form.Encode()))
 	if err != nil {
